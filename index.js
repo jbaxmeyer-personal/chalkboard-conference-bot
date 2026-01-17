@@ -355,11 +355,12 @@ async function runListTeamsDisplay() {
 
     let text = "";
     for (const [conf, tList] of Object.entries(confMap)) {
-      // Show teams with stars <= 2.0 OR any team taken by a user (regardless of star rating)
+      // Show teams with stars 2.0-3.0 OR any team taken by a user (regardless of star rating)
       const filtered = tList.filter(t => {
         const hasTakenBy = t.taken_by && t.taken_by !== '' && t.taken_by !== 'null';
-        const isLowStar = t.stars !== null && parseFloat(t.stars) <= 2.0;
-        return isLowStar || hasTakenBy;
+        const stars = t.stars !== null ? parseFloat(t.stars) : null;
+        const isInRange = stars !== null && stars >= 2.0 && stars <= 3.0;
+        return isInRange || hasTakenBy;
       });
       if (filtered.length === 0) continue;
 
@@ -381,7 +382,7 @@ async function runListTeamsDisplay() {
     if (!text) text = "No teams available.";
 
     const embed = {
-      title: "2★ and Below Teams (+ All User Teams)",
+      title: "2★-3★ Teams (+ All User Teams)",
       description: text,
       color: 0x2b2d31,
       timestamp: new Date()
