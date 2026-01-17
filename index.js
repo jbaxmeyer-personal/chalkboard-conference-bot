@@ -162,7 +162,16 @@ const commands = [
       .setName('new_team')
       .setDescription('Select the new team')
       .setRequired(true)
-      .setAutocomplete(true)),
+      .setAutocomplete(true))
+    .addStringOption(opt => opt
+      .setName('role')
+      .setDescription('Select the role (HC, OC, or DC)')
+      .setRequired(false)
+      .addChoices(
+        { name: 'Head Coach', value: 'HC' },
+        { name: 'Offensive Coordinator', value: 'OC' },
+        { name: 'Defensive Coordinator', value: 'DC' }
+      )),
 
   new SlashCommandBuilder()
     .setName('any-game-result')
@@ -360,8 +369,9 @@ async function runListTeamsDisplay() {
       text += `\n__**${conf}**__\n`;
       for (const t of filtered) {
         if (t.taken_by) {
-          // mention the owner so it's clickable
-          text += `🏈 **${t.name}** — <@${t.taken_by}> (${t.taken_by_name || 'Coach'})\n`;
+          // mention the owner so it's clickable, include role if available
+          const roleLabel = t.role ? ` [${t.role}]` : ' [HC]';
+          text += `🏈 **${t.name}** — <@${t.taken_by}> (${t.taken_by_name || 'Coach'})${roleLabel}\n`;
         } else {
           text += `🟢 **${t.name}** — Available\n`;
         }
@@ -395,7 +405,7 @@ async function runListTeamsDisplay() {
  * Send job offers DM to user (used by slash and reaction flows)
  * returns the array of offered teams (objects) or throws.
  */
-async function sendJobOffersToUser(user, count = 5) {
+async function sendJobOffersToUser(user, count = 5, role = null) {
   // Query Supabase for teams with stars <= 2.0 and not taken (assumes numeric column 'stars' and 'taken_by' col)
   const { data: available, error } = await supabase
     .from('teams')
@@ -410,13 +420,14 @@ async function sendJobOffersToUser(user, count = 5) {
 
   // save into ephemeral in-memory map for DM accept flow
   if (!client.userOffers) client.userOffers = {};
-  client.userOffers[user.id] = offers;
+  client.userOffers[user.id] = { offers, role };
 
   // Build grouped message by conference
   // We want the numbered list per message; because we used pickRandom across conferences,
   // create a unified list with numbers 1..N but still show conferences headers.
   // To make numbering consistent with user's reply, flatten offers and show number prefix.
-  let dmText = `Your Chalkboard Conference job offers:\n\n`;
+  let roleText = role ? ` (${role})` : '';
+  let dmText = `Your Chalkboard Conference job offers${roleText}:\n\n`;
   // group for visual context
   const grouped = {};
   for (let idx = 0; idx < offers.length; idx++) {
@@ -1541,9 +1552,10 @@ client.on('interactionCreate', async interaction => {
         if (oldUpdateErr) throw oldUpdateErr;
 
         // Update new team: add coach
+        const role = interaction.options.getString('role') || 'HC';
         const { error: newUpdateErr } = await supabase
           .from('teams')
-          .update({ taken_by: coachUserId, taken_by_name: coachName })
+          .update({ taken_by: coachUserId, taken_by_name: coachName, role: role })
           .eq('id', newTeamId);
         if (newUpdateErr) throw newUpdateErr;
 
@@ -1637,7 +1649,7 @@ client.on('guildMemberRemove', async (member) => {
 // ---------------------------------------------------------
 // REACTION HANDLER (for rules reaction -> trigger job offers)
 // ---------------------------------------------------------
-// Behavior: when a user reacts with ✅ in the "rules" channel, send them job offers
+// Behavior: when a user reacts with ✅ (OC) or ❌ (DC) in the "rules" channel, send them job offers
 // Adjust channel name or message id if you prefer a different trigger
 client.on('messageReactionAdd', async (reaction, user) => {
   try {
@@ -1646,8 +1658,16 @@ client.on('messageReactionAdd', async (reaction, user) => {
     if (reaction.partial) await reaction.fetch();
     if (reaction.message.partial) await reaction.message.fetch();
 
-    // only watch for ✅
-    if (reaction.emoji.name !== '✅') return;
+    // watch for ✅ (OC) or ❌ (DC)
+    const emojiName = reaction.emoji.name;
+    let role = null;
+    if (emojiName === '✅') {
+      role = 'OC';
+    } else if (emojiName === '❌') {
+      role = 'DC';
+    } else {
+      return; // ignore other emojis
+    }
 
     // optionally restrict to a specific message ID or channel name
     // if you want to restrict to the rules channel, check:
@@ -1655,17 +1675,27 @@ client.on('messageReactionAdd', async (reaction, user) => {
     // CHANGE 'rules' to the exact channel name you use for the rules message
     if (!channel || channel.name !== 'rules') return;
 
-    // soft-lock
+    // soft-lock - check if user has already reacted
     if (jobOfferUsed.has(user.id)) {
       // optionally DM user about why they didn't get offers
       try { await user.send("⛔ You've already received your job offers."); } catch (e) {}
       return;
     }
 
+    // Check if user reacted with both emojis - prevent if so
+    const userReactions = reaction.message.reactions.cache.filter(r => {
+      const name = r.emoji.name;
+      return (name === '✅' || name === '❌') && r.users.cache.has(user.id);
+    });
+    if (userReactions.size > 1) {
+      try { await user.send("⛔ You cannot select both OC and DC. Please remove one reaction."); } catch (e) {}
+      return;
+    }
+
     jobOfferUsed.add(user.id);
 
     try {
-      const offers = await sendJobOffersToUser(user, 5);
+      const offers = await sendJobOffersToUser(user, 5, role);
       if (!offers || offers.length === 0) {
         jobOfferUsed.delete(user.id);
         try { await user.send("No teams available right now."); } catch (e) {}
@@ -1690,7 +1720,9 @@ client.on('messageCreate', async msg => {
     const userId = msg.author.id;
     if (!client.userOffers || !client.userOffers[userId]) return;
 
-    const offers = client.userOffers[userId];
+    const offerData = client.userOffers[userId];
+    const offers = Array.isArray(offerData) ? offerData : offerData.offers;
+    const role = !Array.isArray(offerData) ? offerData.role : null;
     const choice = parseInt(msg.content);
     if (isNaN(choice) || choice < 1 || choice > offers.length) {
       return msg.reply("Reply with the number of the team you choose (from the DM list).");
@@ -1698,11 +1730,15 @@ client.on('messageCreate', async msg => {
 
     const team = offers[choice - 1];
 
-    // Write taken_by and taken_by_name into supabase teams table
-    const updateResp = await supabase.from('teams').update({
+    // Write taken_by, taken_by_name, and role into supabase teams table
+    const updateData = {
       taken_by: userId,
       taken_by_name: msg.author.username
-    }).eq('id', team.id);
+    };
+    if (role) {
+      updateData.role = role;
+    }
+    const updateResp = await supabase.from('teams').update(updateData).eq('id', team.id);
 
     if (updateResp.error) {
       console.error("Failed to claim team:", updateResp.error);
