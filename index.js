@@ -1686,8 +1686,6 @@ client.on('messageReactionAdd', async (reaction, user) => {
       console.log(`[EMOJI] ${user.username} already has offers, rejecting`);
       // optionally DM user about why they didn't get offers
       try { await user.send("⛔ You've already received your job offers."); } catch (e) {}
-      // Remove this reaction to prevent confusion
-      try { await reaction.users.remove(user.id); } catch (e) {}
       return;
     }
     console.log(`[EMOJI] Adding ${user.username} to lock and sending offers`);
@@ -1703,8 +1701,6 @@ client.on('messageReactionAdd', async (reaction, user) => {
       console.log(`[EMOJI] ${user.username} has both emojis, rejecting`);
       jobOfferUsed.delete(user.id); // remove from lock since this is an error case
       try { await user.send("⛔ You cannot select both OC and DC. Please remove one reaction."); } catch (e) {}
-      // Remove this reaction since they shouldn't have both
-      try { await reaction.users.remove(user.id); } catch (e) {}
       return;
     }
 
