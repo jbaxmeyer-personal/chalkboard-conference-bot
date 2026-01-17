@@ -84,7 +84,7 @@ if (!globalThis.jobOfferUsedGlobal) globalThis.jobOfferUsedGlobal = jobOfferUsed
 const commands = [
   new SlashCommandBuilder()
     .setName('joboffers')
-    .setDescription('Get your Headset Dynasty job offers')
+    .setDescription('Get your Chalkboard Conference job offers')
     .setDMPermission(false)
     .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
 
@@ -416,7 +416,7 @@ async function sendJobOffersToUser(user, count = 5) {
   // We want the numbered list per message; because we used pickRandom across conferences,
   // create a unified list with numbers 1..N but still show conferences headers.
   // To make numbering consistent with user's reply, flatten offers and show number prefix.
-  let dmText = `Your Headset Dynasty job offers:\n\n`;
+  let dmText = `Your Chalkboard Conference job offers:\n\n`;
   // group for visual context
   const grouped = {};
   for (let idx = 0; idx < offers.length; idx++) {
@@ -1310,7 +1310,7 @@ client.on('interactionCreate', async interaction => {
         else description += `*Record in parentheses is vs user teams only*`;
 
         const embed = {
-          title: `🏆 Headset Dynasty Rankings – Season ${currentSeason}`,
+          title: `🏆 Chalkboard Conference Rankings – Season ${currentSeason}`,
           description: '```\n' + description + '\n```',
           color: 0xffd700,
           timestamp: new Date()
@@ -1465,7 +1465,7 @@ client.on('interactionCreate', async interaction => {
         else description += `*Record in parentheses is vs user teams only*`;
 
         const embed = {
-          title: `👑 Headset Dynasty All-Time Rankings`,
+          title: `👑 Chalkboard Conference All-Time Rankings`,
           description: '```\n' + description + '\n```',
           color: 0xffd700,
           timestamp: new Date()

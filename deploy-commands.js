@@ -6,7 +6,7 @@ const rest = new REST({ version: "10" }).setToken(process.env.DISCORD_TOKEN);
 const commands = [
   new SlashCommandBuilder()
     .setName("joboffers")
-    .setDescription("Get your Headset Dynasty job offers"),
+    .setDescription("Get your Chalkboard Conference job offers"),
 
   new SlashCommandBuilder()
     .setName("resetteam")
