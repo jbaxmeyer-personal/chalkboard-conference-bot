@@ -1731,6 +1731,9 @@ client.on('messageCreate', async msg => {
 
     const team = offers[choice - 1];
 
+    // Delete offers IMMEDIATELY to prevent double-processing
+    delete client.userOffers[userId];
+
     // Write taken_by, taken_by_name, and role into supabase teams table
     const updateData = {
       taken_by: userId,
@@ -1747,7 +1750,6 @@ client.on('messageCreate', async msg => {
     }
 
     msg.reply(`You accepted the job offer from **${team.name}**!`);
-    delete client.userOffers[userId];
 
     // announce in general channel and perform setup
     const guild = client.guilds.cache.first();
