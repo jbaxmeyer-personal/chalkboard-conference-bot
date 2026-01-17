@@ -1676,12 +1676,13 @@ client.on('messageReactionAdd', async (reaction, user) => {
     // CHANGE 'rules' to the exact channel name you use for the rules message
     if (!channel || channel.name !== 'rules') return;
 
-    // soft-lock - check if user has already reacted
+    // Add to soft-lock FIRST (before any async operations)
     if (jobOfferUsed.has(user.id)) {
       // optionally DM user about why they didn't get offers
       try { await user.send("⛔ You've already received your job offers."); } catch (e) {}
       return;
     }
+    jobOfferUsed.add(user.id);
 
     // Check if user reacted with both emojis - prevent if so
     const userReactions = reaction.message.reactions.cache.filter(r => {
@@ -1689,11 +1690,10 @@ client.on('messageReactionAdd', async (reaction, user) => {
       return (name === '✅' || name === '❌') && r.users.cache.has(user.id);
     });
     if (userReactions.size > 1) {
+      jobOfferUsed.delete(user.id); // remove from lock since this is an error case
       try { await user.send("⛔ You cannot select both OC and DC. Please remove one reaction."); } catch (e) {}
       return;
     }
-
-    jobOfferUsed.add(user.id);
 
     try {
       const offers = await sendJobOffersToUser(user, 5, role);
