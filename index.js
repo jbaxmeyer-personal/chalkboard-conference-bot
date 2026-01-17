@@ -1670,18 +1670,27 @@ client.on('messageReactionAdd', async (reaction, user) => {
       return; // ignore other emojis
     }
 
+    console.log(`[EMOJI] User ${user.username} (${user.id}) reacted with ${emojiName} (${role})`);
+
     // optionally restrict to a specific message ID or channel name
     // if you want to restrict to the rules channel, check:
     const channel = reaction.message.channel;
     // CHANGE 'rules' to the exact channel name you use for the rules message
-    if (!channel || channel.name !== 'rules') return;
+    if (!channel || channel.name !== 'rules') {
+      console.log(`[EMOJI] Ignoring - not in rules channel (channel: ${channel?.name})`);
+      return;
+    }
 
     // Add to soft-lock FIRST (before any async operations)
     if (jobOfferUsed.has(user.id)) {
+      console.log(`[EMOJI] ${user.username} already has offers, rejecting`);
       // optionally DM user about why they didn't get offers
       try { await user.send("⛔ You've already received your job offers."); } catch (e) {}
+      // Remove this reaction to prevent confusion
+      try { await reaction.users.remove(user.id); } catch (e) {}
       return;
     }
+    console.log(`[EMOJI] Adding ${user.username} to lock and sending offers`);
     jobOfferUsed.add(user.id);
 
     // Check if user reacted with both emojis - prevent if so
@@ -1689,14 +1698,19 @@ client.on('messageReactionAdd', async (reaction, user) => {
       const name = r.emoji.name;
       return (name === '✅' || name === '❌') && r.users.cache.has(user.id);
     });
+    console.log(`[EMOJI] ${user.username} has ${userReactions.size} total valid reactions`);
     if (userReactions.size > 1) {
+      console.log(`[EMOJI] ${user.username} has both emojis, rejecting`);
       jobOfferUsed.delete(user.id); // remove from lock since this is an error case
       try { await user.send("⛔ You cannot select both OC and DC. Please remove one reaction."); } catch (e) {}
+      // Remove this reaction since they shouldn't have both
+      try { await reaction.users.remove(user.id); } catch (e) {}
       return;
     }
 
     try {
       const offers = await sendJobOffersToUser(user, 5, role);
+      console.log(`[EMOJI] Sent ${offers.length} offers to ${user.username}`);
       if (!offers || offers.length === 0) {
         jobOfferUsed.delete(user.id);
         try { await user.send("No teams available right now."); } catch (e) {}
