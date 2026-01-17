@@ -1,1 +1,1 @@
-# chalkboard-conference-bot
+# headset-dynasty-bot
