@@ -1714,6 +1714,12 @@ client.on('messageReactionAdd', async (reaction, user) => {
       if (!offers || offers.length === 0) {
         jobOfferUsed.delete(user.id);
         try { await user.send("No teams available right now."); } catch (e) {}
+      } else {
+        // Auto-clear the lock after 30 minutes if they don't accept
+        setTimeout(() => {
+          jobOfferUsed.delete(user.id);
+          console.log(`[EMOJI] Cleared lock for ${user.username} (30 min timeout)`);
+        }, 30 * 60 * 1000);
       }
     } catch (err) {
       console.error("sendJobOffersToUser error:", err);
