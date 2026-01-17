@@ -406,11 +406,12 @@ async function runListTeamsDisplay() {
  * returns the array of offered teams (objects) or throws.
  */
 async function sendJobOffersToUser(user, count = 5, role = null) {
-  // Query Supabase for teams with stars <= 2.0 and not taken (assumes numeric column 'stars' and 'taken_by' col)
+  // Query Supabase for teams with stars between 2.0 and 3.0 (inclusive) and not taken
   const { data: available, error } = await supabase
     .from('teams')
     .select('*')
-    .lte('stars', 2.0)
+    .gte('stars', 2.0)
+    .lte('stars', 3.0)
     .is('taken_by', null);
 
   if (error) throw error;
@@ -427,7 +428,7 @@ async function sendJobOffersToUser(user, count = 5, role = null) {
   // create a unified list with numbers 1..N but still show conferences headers.
   // To make numbering consistent with user's reply, flatten offers and show number prefix.
   let roleText = role ? ` (${role})` : '';
-  let dmText = `Your Chalkboard Conference job offers${roleText}:\n\n`;
+  let dmText = `Your Chalkboard Conference job offers ${roleText}:\n\n`;
   // group for visual context
   const grouped = {};
   for (let idx = 0; idx < offers.length; idx++) {
