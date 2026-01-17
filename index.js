@@ -1747,6 +1747,8 @@ client.on('messageCreate', async msg => {
 
     // Delete offers IMMEDIATELY to prevent double-processing
     delete client.userOffers[userId];
+    // Also remove from the reaction lock so they can get offers again if needed
+    jobOfferUsed.delete(userId);
 
     // Write taken_by, taken_by_name, and role into supabase teams table
     const updateData = {
