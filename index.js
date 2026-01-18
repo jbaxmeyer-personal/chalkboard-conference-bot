@@ -1904,8 +1904,16 @@ client.on('warn', msg => {
   console.warn("[CLIENT WARN]", msg);
 });
 
+client.on('debug', msg => {
+  if (msg.includes('READY') || msg.includes('CONNECT') || msg.includes('auth')) {
+    console.log("[DEBUG]", msg);
+  }
+});
+
 client.once('connecting', () => console.log("[LOGIN] Bot is connecting to Discord..."));
 client.once('reconnecting', () => console.log("[LOGIN] Bot is reconnecting..."));
+client.once('disconnect', () => console.log("[LOGIN] Bot disconnected"));
+client.once('ready', () => console.log("[LOGIN] Bot is READY!"));
 
 console.log("[LOGIN] About to call client.login()...");
 try {
