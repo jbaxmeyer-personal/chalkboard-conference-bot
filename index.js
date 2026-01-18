@@ -203,28 +203,51 @@ console.log("ENV CHECK - GUILD_ID:", process.env.GUILD_ID);
 
 const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);
 
-(async () => {
-  try {
-    console.log("Clearing old global commands...");
-    const clearResult = await Promise.race([
-      rest.put(Routes.applicationCommands(process.env.CLIENT_ID), { body: [] }),
-      new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout after 10s')), 10000))
-    ]);
-    console.log("Cleared global commands, result:", clearResult);
-    
-    console.log("Registering guild commands...");
-    const registerResult = await Promise.race([
-      rest.put(Routes.applicationGuildCommands(process.env.CLIENT_ID, process.env.GUILD_ID), { body: commands }),
-      new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout after 10s')), 10000))
-    ]);
-    console.log("Slash commands registered to guild.");
-  } catch (err) {
-    console.error("Failed to register commands:", err);
-    console.error("Error message:", err.message);
-    console.error("Error code:", err.code);
-    console.error("Full error:", JSON.stringify(err, null, 2));
+// Helper function to register commands with retry logic
+async function registerCommands(retries = 3, timeoutMs = 30000) {
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    try {
+      console.log(`Attempt ${attempt}/${retries}: Clearing old global commands...`);
+      const clearResult = await Promise.race([
+        rest.put(Routes.applicationCommands(process.env.CLIENT_ID), { body: [] }),
+        new Promise((_, reject) => setTimeout(() => reject(new Error(`Timeout after ${timeoutMs/1000}s`)), timeoutMs))
+      ]);
+      console.log("Cleared global commands successfully");
+      
+      console.log(`Attempt ${attempt}/${retries}: Registering guild commands...`);
+      const registerResult = await Promise.race([
+        rest.put(Routes.applicationGuildCommands(process.env.CLIENT_ID, process.env.GUILD_ID), { body: commands }),
+        new Promise((_, reject) => setTimeout(() => reject(new Error(`Timeout after ${timeoutMs/1000}s`)), timeoutMs))
+      ]);
+      console.log("✓ Slash commands registered to guild successfully");
+      return true;
+    } catch (err) {
+      console.error(`Attempt ${attempt}/${retries} failed:`, err.message);
+      if (attempt === retries) {
+        console.error("Failed to register commands after all retries. Bot will continue but commands may not work.");
+        console.error("Error details:", {
+          message: err.message,
+          code: err.code,
+          status: err.status
+        });
+        return false;
+      }
+      // Wait before retry (exponential backoff)
+      const waitTime = Math.min(1000 * Math.pow(2, attempt - 1), 10000);
+      console.log(`Waiting ${waitTime}ms before retry...`);
+      await new Promise(resolve => setTimeout(resolve, waitTime));
+    }
   }
-})();
+}
+
+// Register commands asynchronously (non-blocking)
+registerCommands().then(success => {
+  if (success) {
+    console.log("Command registration completed successfully");
+  } else {
+    console.log("Command registration failed - you may need to register manually or restart");
+  }
+});
 
 // ---------------------------------------------------------
 // BOT READY
