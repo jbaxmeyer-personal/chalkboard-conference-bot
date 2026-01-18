@@ -201,79 +201,55 @@ console.log("ENV CHECK - Token length:", process.env.DISCORD_TOKEN?.length, "Tok
 console.log("ENV CHECK - CLIENT_ID:", process.env.CLIENT_ID);
 console.log("ENV CHECK - GUILD_ID:", process.env.GUILD_ID);
 
-const rest = new REST({ version: '10', timeout: 15000 }).setToken(process.env.DISCORD_TOKEN);
+const rest = new REST({ version: '10', timeout: 60000 }).setToken(process.env.DISCORD_TOKEN);
+
+// Track if commands were registered successfully
+let commandsRegistered = false;
 
 // Helper function to register commands with retry logic
-async function registerCommands(retries = 3) {
-  for (let attempt = 1; attempt <= retries; attempt++) {
-    try {
-      // First, test if we can reach Discord API at all
-      if (attempt === 1) {
-        console.log("Testing Discord API connection...");
-        try {
-          const testTimeout = 10000;
-          await Promise.race([
-            rest.get(Routes.user('@me')),
-            new Promise((_, reject) => setTimeout(() => reject(new Error('Connection test timeout')), testTimeout))
-          ]);
-          console.log("✓ Discord API connection successful");
-        } catch (testErr) {
-          console.error("⚠ Discord API connection test failed:", testErr.message);
-          console.error("This may indicate network issues or invalid credentials");
-        }
-      }
-      
-      // Only register guild commands (no need to clear global commands)
-      console.log(`Attempt ${attempt}/${retries}: Registering ${commands.length} guild commands...`);
-      const registerResult = await rest.put(
-        Routes.applicationGuildCommands(process.env.CLIENT_ID, process.env.GUILD_ID), 
-        { body: commands }
-      );
-      console.log(`✓ Successfully registered ${registerResult.length} slash commands to guild`);
-      return true;
-    } catch (err) {
-      console.error(`Attempt ${attempt}/${retries} failed:`, err.message);
-      
-      // Log detailed error info
-      if (err.code) console.error("Error code:", err.code);
-      if (err.status) console.error("HTTP status:", err.status);
-      if (err.method) console.error("Method:", err.method);
-      if (err.url) console.error("URL:", err.url);
-      
-      if (attempt === retries) {
-        console.error("❌ Failed to register commands after all retries.");
-        console.error("Bot will continue but slash commands may not work.");
-        console.error("Possible causes:");
-        console.error("  - Invalid DISCORD_TOKEN, CLIENT_ID, or GUILD_ID");
-        console.error("  - Network connectivity issues");
-        console.error("  - Discord API rate limiting or outage");
-        console.error("  - Bot not added to the guild yet");
-        return false;
-      }
-      
-      // Wait before retry (exponential backoff)
-      const waitTime = Math.min(2000 * Math.pow(2, attempt - 1), 15000);
-      console.log(`Waiting ${waitTime}ms before retry...`);
-      await new Promise(resolve => setTimeout(resolve, waitTime));
-    }
+async function registerCommands() {
+  if (commandsRegistered) {
+    console.log("Commands already registered, skipping");
+    return true;
   }
-  return false;
+  
+  try {
+    console.log(`Registering ${commands.length} guild commands...`);
+    const registerResult = await rest.put(
+      Routes.applicationGuildCommands(process.env.CLIENT_ID, process.env.GUILD_ID), 
+      { body: commands }
+    );
+    console.log(`✓ Successfully registered ${registerResult.length} slash commands`);
+    commandsRegistered = true;
+    return true;
+  } catch (err) {
+    console.error("⚠ Command registration failed:", err.message);
+    if (err.code) console.error("  Error code:", err.code);
+    if (err.status) console.error("  HTTP status:", err.status);
+    return false;
+  }
 }
 
-// Register commands asynchronously (non-blocking)
-registerCommands().then(success => {
-  if (success) {
-    console.log("Command registration completed successfully");
-  } else {
-    console.log("Command registration failed - you may need to register manually or restart");
-  }
-});
+// Try to register commands early (non-blocking, will retry on bot ready if it fails)
+setTimeout(() => {
+  registerCommands().catch(err => {
+    console.log("Early registration failed, will retry when bot is ready");
+  });
+}, 3000); // Wait 3 seconds for health check to establish first
 
 // ---------------------------------------------------------
 // BOT READY
 // ---------------------------------------------------------
 client.once('ready', async () => {
   console.log(`Logged in as ${client.user.tag}`);
+
+  // Try to register commands if they weren't registered during startup
+  if (!commandsRegistered) {
+    console.log("Attempting command registration from ready event...");
+    await registerCommands().catch(err => {
+      console.error("Failed to register commands from ready event:", err.message);
+    });
+  }
 
   // Set up role-based permissions after bot is ready
   // If CLIENT_SECRET isn't provided we cannot obtain an OAuth2 application
