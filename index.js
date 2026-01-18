@@ -79,9 +79,22 @@ if (!globalThis.jobOfferUsedGlobal) globalThis.jobOfferUsedGlobal = jobOfferUsed
 
 // Start the bot login immediately (don't wait for command registration)
 console.log("Starting Discord bot login...");
-client.login(process.env.DISCORD_TOKEN).catch(e => {
-  console.error("Failed to login:", e);
-  process.exit(1);
+client.login(process.env.DISCORD_TOKEN)
+  .then(() => console.log("Discord login initiated successfully"))
+  .catch(e => {
+    console.error("FATAL: Failed to login to Discord:", e);
+    process.exit(1);
+  });
+
+// Log when bot connects to gateway
+client.on('debug', (info) => {
+  if (info.includes('Session') || info.includes('Ready') || info.includes('READY')) {
+    console.log('[Gateway]', info);
+  }
+});
+
+client.on('error', (error) => {
+  console.error('[Discord Client Error]', error);
 });
 
 // ---------------------------------------------------------
@@ -241,15 +254,14 @@ async function registerCommands() {
 // BOT READY
 // ---------------------------------------------------------
 client.once('ready', async () => {
-  console.log(`Logged in as ${client.user.tag}`);
+  console.log(`✓✓✓ BOT IS ONLINE - Logged in as ${client.user.tag} ✓✓✓`);
+  console.log(`Bot is in ${client.guilds.cache.size} guild(s)`);
 
-  // Try to register commands if they weren't registered during startup
-  if (!commandsRegistered) {
-    console.log("Attempting command registration from ready event...");
-    await registerCommands().catch(err => {
-      console.error("Failed to register commands from ready event:", err.message);
-    });
-  }
+  // Register commands now that bot is connected
+  console.log("Registering commands now that bot is online...");
+  await registerCommands().catch(err => {
+    console.error("Failed to register commands:", err.message);
+  });
 
   // Set up role-based permissions after bot is ready
   // If CLIENT_SECRET isn't provided we cannot obtain an OAuth2 application
@@ -500,6 +512,8 @@ async function sendJobOffersToUser(user, count = 5, role = null) {
 client.on('interactionCreate', async interaction => {
   try {
     // Log all interactions
+    console.log(`[INTERACTION RECEIVED] Type: ${interaction.type}, User: ${interaction.user.tag}`);
+    
     if (interaction.isCommand()) {
       console.log(`[COMMAND] /${interaction.commandName} from ${interaction.user.tag}`);
     }
