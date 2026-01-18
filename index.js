@@ -1893,45 +1893,7 @@ const _shutdown = async (signal) => {
 process.on('SIGTERM', () => _shutdown('SIGTERM'));
 process.on('SIGINT', () => _shutdown('SIGINT'));
 
-console.log("Attempting to login with token:", process.env.DISCORD_TOKEN ? `${process.env.DISCORD_TOKEN.substring(0, 20)}...` : "NOT SET");
-console.log("[LOGIN] Registering event listeners...");
-
-client.on('error', err => {
-  console.error("[CLIENT ERROR]", err.code || err.message);
+// Simple login without all the complexity
+client.login(process.env.DISCORD_TOKEN).catch(e => {
+  console.error("Failed to login:", e.message);
 });
-
-client.on('warn', msg => {
-  console.warn("[CLIENT WARN]", msg);
-});
-
-client.on('debug', msg => {
-  if (msg.includes('READY') || msg.includes('CONNECT') || msg.includes('auth')) {
-    console.log("[DEBUG]", msg);
-  }
-});
-
-client.once('connecting', () => console.log("[LOGIN] Bot is connecting to Discord..."));
-client.once('reconnecting', () => console.log("[LOGIN] Bot is reconnecting..."));
-client.once('disconnect', () => console.log("[LOGIN] Bot disconnected"));
-client.once('ready', () => console.log("[LOGIN] Bot is READY!"));
-
-console.log("[LOGIN] About to call client.login()...");
-try {
-  const loginPromise = client.login(process.env.DISCORD_TOKEN);
-  console.log("[LOGIN] client.login() called, setting up handlers...");
-  
-  loginPromise.catch(e => {
-    console.error("Failed to login - Error code:", e.code);
-    console.error("Error message:", e.message);
-    console.error("Will retry in 10 seconds...");
-    setTimeout(() => {
-      console.log("[LOGIN] Retrying login...");
-      client.login(process.env.DISCORD_TOKEN);
-    }, 10000);
-  });
-} catch (e) {
-  console.error("[FATAL] Error during login attempt:", e.message);
-  console.error(e.stack);
-}
-
-console.log("[STARTUP] Initialization complete - waiting for Discord connection...");
