@@ -46,6 +46,11 @@ if (process.env.SELF_PING_URL) {
 // DISCORD + SUPABASE
 // ---------------------------------------------------------
 
+// Disable output buffering
+if (process.stdout._handle && process.stdout._handle.setBlocking) {
+  process.stdout._handle.setBlocking(true);
+}
+
 const {
   Client,
   GatewayIntentBits,
@@ -1892,12 +1897,17 @@ client.on('warn', msg => {
 client.once('connecting', () => console.log("Bot is connecting to Discord..."));
 client.once('reconnecting', () => console.log("Bot is reconnecting..."));
 
-client.login(process.env.DISCORD_TOKEN).catch(e => {
-  console.error("Failed to login - Error code:", e.code);
-  console.error("Error message:", e.message);
-  console.error("Will retry in 10 seconds...");
-  setTimeout(() => {
-    console.log("Retrying login...");
-    client.login(process.env.DISCORD_TOKEN);
-  }, 10000);
-});
+try {
+  client.login(process.env.DISCORD_TOKEN).catch(e => {
+    console.error("Failed to login - Error code:", e.code);
+    console.error("Error message:", e.message);
+    console.error("Will retry in 10 seconds...");
+    setTimeout(() => {
+      console.log("Retrying login...");
+      client.login(process.env.DISCORD_TOKEN);
+    }, 10000);
+  });
+} catch (e) {
+  console.error("[FATAL] Error during login attempt:", e.message);
+  console.error(e.stack);
+}
