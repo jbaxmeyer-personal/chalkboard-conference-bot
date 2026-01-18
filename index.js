@@ -1068,12 +1068,12 @@ client.on('interactionCreate', async interaction => {
       const seasonResp = await supabase.from('meta').select('value').eq('key','current_season').maybeSingle();
       const currentSeason = seasonResp.data?.value != null ? Number(seasonResp.data.value) : 1;
 
-      // post advance message in advance channel
-      const guild = client.guilds.cache.first();
-      if (guild) {
-        const advanceChannel = guild.channels.cache.find(c => c.name === 'advance' && c.isTextBased());
-        if (advanceChannel) await advanceChannel.send("We have advanced to the next week").catch(() => {});
-      }
+      // post advance message in advance channel (commented out - no advance channel in server)
+      // const guild = client.guilds.cache.first();
+      // if (guild) {
+      //   const advanceChannel = guild.channels.cache.find(c => c.name === 'advance' && c.isTextBased());
+      //   if (advanceChannel) await advanceChannel.send("We have advanced to the next week").catch(() => {});
+      // }
 
       // fetch news_feed posts since last advance (week == currentWeek)
       // fetch news_feed posts since last advance (week == currentWeek)
@@ -1193,18 +1193,18 @@ client.on('interactionCreate', async interaction => {
       await supabase.from('meta').update({ value: currentSeason + 1 }).eq('key','current_season');
       await supabase.from('meta').update({ value: 0 }).eq('key','current_week');
 
-      // announce season advance in advance channel
-      try {
-        const guild = client.guilds.cache.first();
-        if (guild) {
-          const advanceChannel = guild.channels.cache.find(c => c.name === 'advance' && c.isTextBased());
-          if (advanceChannel) {
-            await advanceChannel.send(`We have advanced to Season ${currentSeason + 1}`).catch(() => {});
-          }
-        }
-      } catch (err) {
-        console.error('Failed to post season advance message:', err);
-      }
+      // announce season advance in advance channel (commented out - no advance channel in server)
+      // try {
+      //   const guild = client.guilds.cache.first();
+      //   if (guild) {
+      //     const advanceChannel = guild.channels.cache.find(c => c.name === 'advance' && c.isTextBased());
+      //     if (advanceChannel) {
+      //       await advanceChannel.send(`We have advanced to Season ${currentSeason + 1}`).catch(() => {});
+      //     }
+      //   }
+      // } catch (err) {
+      //   console.error('Failed to post season advance message:', err);
+      // }
 
       return interaction.reply({ ephemeral: true, content: `Season advanced to ${currentSeason + 1}, week reset to 0.` });
     }
