@@ -1876,16 +1876,42 @@ process.on('SIGTERM', () => _shutdown('SIGTERM'));
 process.on('SIGINT', () => _shutdown('SIGINT'));
 
 console.log("Attempting to login with token:", process.env.DISCORD_TOKEN ? "SET" : "NOT SET");
-const loginTimeout = setTimeout(() => {
-  console.error("Login timeout - bot took more than 30 seconds to connect");
-  process.exit(1);
-}, 30000);
 
-client.login(process.env.DISCORD_TOKEN).then(() => {
-  clearTimeout(loginTimeout);
-}).catch(e => {
-  clearTimeout(loginTimeout);
-  console.error("Failed to login:", e.message);
-  console.error("Full error:", e);
-  process.exit(1);
+// Test Discord API connectivity first
+const testDiscord = async () => {
+  try {
+    console.log("Testing Discord API connectivity...");
+    const res = await fetch('https://discord.com/api/v10/gateway');
+    console.log("Discord API response status:", res.status);
+    if (!res.ok) {
+      console.error("Discord API returned:", res.statusText);
+      return false;
+    }
+    console.log("Discord API is reachable");
+    return true;
+  } catch (e) {
+    console.error("Cannot reach Discord API:", e.message);
+    return false;
+  }
+};
+
+testDiscord().then(isUp => {
+  if (!isUp) {
+    console.error("Discord is unreachable, exiting");
+    process.exit(1);
+  }
+  
+  const loginTimeout = setTimeout(() => {
+    console.error("Login timeout - bot took more than 30 seconds to connect");
+    process.exit(1);
+  }, 30000);
+
+  client.login(process.env.DISCORD_TOKEN).then(() => {
+    clearTimeout(loginTimeout);
+  }).catch(e => {
+    clearTimeout(loginTimeout);
+    console.error("Failed to login:", e.message);
+    console.error("Full error:", e);
+    process.exit(1);
+  });
 });
