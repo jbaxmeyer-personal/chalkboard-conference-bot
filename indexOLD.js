@@ -46,6 +46,11 @@ if (process.env.SELF_PING_URL) {
 // DISCORD + SUPABASE
 // ---------------------------------------------------------
 
+// Disable output buffering
+if (process.stdout._handle && process.stdout._handle.setBlocking) {
+  process.stdout._handle.setBlocking(true);
+}
+
 const {
   Client,
   GatewayIntentBits,
@@ -72,6 +77,15 @@ const client = new Client({
     GatewayIntentBits.GuildMessageReactions
   ],
   partials: [ Partials.Message, Partials.Channel, Partials.Reaction ]
+});
+
+console.log("[STARTUP] Discord client initialized");
+console.log("[STARTUP] Required env vars:", {
+  TOKEN: process.env.DISCORD_TOKEN ? "SET" : "NOT SET",
+  CLIENT_ID: process.env.CLIENT_ID ? "SET" : "NOT SET",
+  GUILD_ID: process.env.GUILD_ID ? "SET" : "NOT SET",
+  SUPABASE_URL: process.env.SUPABASE_URL ? "SET" : "NOT SET",
+  SUPABASE_KEY: process.env.SUPABASE_KEY ? "SET" : "NOT SET"
 });
 
 const jobOfferUsed = new Set(); // soft-lock so users don't spam requests
@@ -191,14 +205,24 @@ const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);
 (async () => {
   try {
     console.log("Clearing old global commands...");
-    await rest.put(Routes.applicationCommands(process.env.CLIENT_ID), { body: [] });
+    const clearResp = await rest.put(Routes.applicationCommands(process.env.CLIENT_ID), { body: [] });
+    console.log("✓ Cleared old global commands");
+    
     console.log("Registering guild commands...");
-    await rest.put(Routes.applicationGuildCommands(process.env.CLIENT_ID, process.env.GUILD_ID), { body: commands });
-    console.log("Slash commands registered to guild.");
+    const registerResp = await rest.put(Routes.applicationGuildCommands(process.env.CLIENT_ID, process.env.GUILD_ID), { body: commands });
+    console.log(`✓ Slash commands registered to guild (${registerResp.length} commands)`);
   } catch (err) {
-    console.error("Failed to register commands:", err);
+    console.error("Failed to register commands:");
+    console.error("  Error code:", err.code);
+    console.error("  Error message:", err.message);
+    if (err.status) console.error("  HTTP status:", err.status);
+    // Don't fail startup if command registration fails - the bot can still run
+    // Command registration can be retried manually if needed
   }
-})();
+})().catch(e => {
+  console.error("Startup command registration error:", e.message);
+  console.error("Stack:", e.stack);
+});
 
 // ---------------------------------------------------------
 // BOT READY
@@ -320,7 +344,7 @@ function buildOffersGroupedByConference(offers) {
 }
 
 /**
- * Run the listteams display logic (posts to member-list channel)
+ * Run the listteams display logic (posts to team-list channel)
  * Called both by /listteams command and by team claim/reset flows
  */
 async function runListTeamsDisplay() {
@@ -339,7 +363,7 @@ async function runListTeamsDisplay() {
     const guild = client.guilds.cache.first();
     if (!guild) return false;
 
-    const channel = guild.channels.cache.find(c => c.name === 'member-list' && c.isTextBased());
+    const channel = guild.channels.cache.find(c => c.name === 'team-list' && c.isTextBased());
     if (!channel) return false;
 
     // delete old bot messages FIRST
@@ -355,11 +379,12 @@ async function runListTeamsDisplay() {
 
     let text = "";
     for (const [conf, tList] of Object.entries(confMap)) {
-      // Show teams with stars <= 2.0 OR any team taken by a user (regardless of star rating)
+      // Show teams with stars 2.0-3.0 OR any team taken by a user (regardless of star rating)
       const filtered = tList.filter(t => {
         const hasTakenBy = t.taken_by && t.taken_by !== '' && t.taken_by !== 'null';
-        const isLowStar = t.stars !== null && parseFloat(t.stars) <= 2.0;
-        return isLowStar || hasTakenBy;
+        const stars = t.stars !== null ? parseFloat(t.stars) : null;
+        const isInRange = stars !== null && stars >= 2.0 && stars <= 3.0;
+        return isInRange || hasTakenBy;
       });
       if (filtered.length === 0) continue;
 
@@ -369,8 +394,9 @@ async function runListTeamsDisplay() {
       text += `\n__**${conf}**__\n`;
       for (const t of filtered) {
         if (t.taken_by) {
-          // mention the owner so it's clickable
-          text += `🏈 **${t.name}** — <@${t.taken_by}> (${t.taken_by_name || 'Coach'})\n`;
+          // mention the owner so it's clickable, include role if available
+          const roleLabel = t.role ? ` [${t.role}]` : ' [HC]';
+          text += `🏈 **${t.name}** — <@${t.taken_by}> (${t.taken_by_name || 'Coach'})${roleLabel}\n`;
         } else {
           text += `🟢 **${t.name}** — Available\n`;
         }
@@ -380,7 +406,7 @@ async function runListTeamsDisplay() {
     if (!text) text = "No teams available.";
 
     const embed = {
-      title: "2★ and Below Teams (+ All User Teams)",
+      title: "2★-3★ Teams (+ All User Teams)",
       description: text,
       color: 0x2b2d31,
       timestamp: new Date()
@@ -656,7 +682,7 @@ client.on('interactionCreate', async interaction => {
         return interaction.editReply("Error posting team list.");
       }
 
-      return interaction.editReply("Team list posted to #member-list.");
+      return interaction.editReply("Team list posted to #team-list.");
     }
 
     // ---------------------------
@@ -1066,12 +1092,12 @@ client.on('interactionCreate', async interaction => {
       const seasonResp = await supabase.from('meta').select('value').eq('key','current_season').maybeSingle();
       const currentSeason = seasonResp.data?.value != null ? Number(seasonResp.data.value) : 1;
 
-      // post advance message in advance channel
-      const guild = client.guilds.cache.first();
-      if (guild) {
-        const advanceChannel = guild.channels.cache.find(c => c.name === 'advance' && c.isTextBased());
-        if (advanceChannel) await advanceChannel.send("We have advanced to the next week").catch(() => {});
-      }
+      // post advance message in advance channel (commented out - no advance channel in server)
+      // const guild = client.guilds.cache.first();
+      // if (guild) {
+      //   const advanceChannel = guild.channels.cache.find(c => c.name === 'advance' && c.isTextBased());
+      //   if (advanceChannel) await advanceChannel.send("We have advanced to the next week").catch(() => {});
+      // }
 
       // fetch news_feed posts since last advance (week == currentWeek)
       // fetch news_feed posts since last advance (week == currentWeek)
@@ -1191,18 +1217,18 @@ client.on('interactionCreate', async interaction => {
       await supabase.from('meta').update({ value: currentSeason + 1 }).eq('key','current_season');
       await supabase.from('meta').update({ value: 0 }).eq('key','current_week');
 
-      // announce season advance in advance channel
-      try {
-        const guild = client.guilds.cache.first();
-        if (guild) {
-          const advanceChannel = guild.channels.cache.find(c => c.name === 'advance' && c.isTextBased());
-          if (advanceChannel) {
-            await advanceChannel.send(`We have advanced to Season ${currentSeason + 1}`).catch(() => {});
-          }
-        }
-      } catch (err) {
-        console.error('Failed to post season advance message:', err);
-      }
+      // announce season advance in advance channel (commented out - no advance channel in server)
+      // try {
+      //   const guild = client.guilds.cache.first();
+      //   if (guild) {
+      //     const advanceChannel = guild.channels.cache.find(c => c.name === 'advance' && c.isTextBased());
+      //     if (advanceChannel) {
+      //       await advanceChannel.send(`We have advanced to Season ${currentSeason + 1}`).catch(() => {});
+      //     }
+      //   }
+      // } catch (err) {
+      //   console.error('Failed to post season advance message:', err);
+      // }
 
       return interaction.reply({ ephemeral: true, content: `Season advanced to ${currentSeason + 1}, week reset to 0.` });
     }
@@ -1649,7 +1675,7 @@ client.on('guildMemberRemove', async (member) => {
 // ---------------------------------------------------------
 // REACTION HANDLER (for rules reaction -> trigger job offers)
 // ---------------------------------------------------------
-// Behavior: when a user reacts with ✅ in the "rules" channel, send them job offers
+// Behavior: when a user reacts with ✅ (OC) or ❌ (DC) in the "rules" channel, send them job offers
 // Adjust channel name or message id if you prefer a different trigger
 client.on('messageReactionAdd', async (reaction, user) => {
   try {
@@ -1658,29 +1684,63 @@ client.on('messageReactionAdd', async (reaction, user) => {
     if (reaction.partial) await reaction.fetch();
     if (reaction.message.partial) await reaction.message.fetch();
 
-    // only watch for ✅
-    if (reaction.emoji.name !== '✅') return;
+    // watch for ✅ (OC) or ❌ (DC)
+    const emojiName = reaction.emoji.name;
+    let role = null;
+    if (emojiName === '✅') {
+      role = 'OC';
+    } else if (emojiName === '❌') {
+      role = 'DC';
+    } else {
+      return; // ignore other emojis
+    }
+
+    console.log(`[EMOJI] User ${user.username} (${user.id}) reacted with ${emojiName} (${role})`);
 
     // optionally restrict to a specific message ID or channel name
     // if you want to restrict to the rules channel, check:
     const channel = reaction.message.channel;
     // CHANGE 'rules' to the exact channel name you use for the rules message
-    if (!channel || channel.name !== 'rules') return;
+    if (!channel || channel.name !== 'rules') {
+      console.log(`[EMOJI] Ignoring - not in rules channel (channel: ${channel?.name})`);
+      return;
+    }
 
-    // soft-lock
+    // Add to soft-lock FIRST (before any async operations)
     if (jobOfferUsed.has(user.id)) {
+      console.log(`[EMOJI] ${user.username} already has offers, rejecting`);
       // optionally DM user about why they didn't get offers
       try { await user.send("⛔ You've already received your job offers."); } catch (e) {}
       return;
     }
-
+    console.log(`[EMOJI] Adding ${user.username} to lock and sending offers`);
     jobOfferUsed.add(user.id);
 
+    // Check if user reacted with both emojis - prevent if so
+    const userReactions = reaction.message.reactions.cache.filter(r => {
+      const name = r.emoji.name;
+      return (name === '✅' || name === '❌') && r.users.cache.has(user.id);
+    });
+    console.log(`[EMOJI] ${user.username} has ${userReactions.size} total valid reactions`);
+    if (userReactions.size > 1) {
+      console.log(`[EMOJI] ${user.username} has both emojis, rejecting`);
+      jobOfferUsed.delete(user.id); // remove from lock since this is an error case
+      try { await user.send("⛔ You cannot select both OC and DC. Please remove one reaction."); } catch (e) {}
+      return;
+    }
+
     try {
-      const offers = await sendJobOffersToUser(user, 5);
+      const offers = await sendJobOffersToUser(user, 5, role);
+      console.log(`[EMOJI] Sent ${offers.length} offers to ${user.username}`);
       if (!offers || offers.length === 0) {
         jobOfferUsed.delete(user.id);
         try { await user.send("No teams available right now."); } catch (e) {}
+      } else {
+        // Auto-clear the lock after 30 minutes if they don't accept
+        setTimeout(() => {
+          jobOfferUsed.delete(user.id);
+          console.log(`[EMOJI] Cleared lock for ${user.username} (30 min timeout)`);
+        }, 30 * 60 * 1000);
       }
     } catch (err) {
       console.error("sendJobOffersToUser error:", err);
@@ -1839,6 +1899,7 @@ const _shutdown = async (signal) => {
 process.on('SIGTERM', () => _shutdown('SIGTERM'));
 process.on('SIGINT', () => _shutdown('SIGINT'));
 
+// Simple login without all the complexity
 client.login(process.env.DISCORD_TOKEN).catch(e => {
-  console.error("Failed to login:", e);
+  console.error("Failed to login:", e.message);
 });
