@@ -203,23 +203,20 @@ console.log("ENV CHECK - GUILD_ID:", process.env.GUILD_ID);
 
 const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);
 
-(async () => {
+// ---------------------------------------------------------
+// BOT READY
+// ---------------------------------------------------------
+client.once('ready', async () => {
+  console.log(`Logged in as ${client.user.tag}`);
+  
+  // Register guild commands after login
   try {
-    console.log("Clearing old global commands...");
-    await rest.put(Routes.applicationCommands(process.env.CLIENT_ID), { body: [] });
     console.log("Registering guild commands...");
     await rest.put(Routes.applicationGuildCommands(process.env.CLIENT_ID, process.env.GUILD_ID), { body: commands });
     console.log("Slash commands registered to guild.");
   } catch (err) {
     console.error("Failed to register commands:", err);
   }
-})();
-
-// ---------------------------------------------------------
-// BOT READY
-// ---------------------------------------------------------
-client.once('ready', async () => {
-  console.log(`Logged in as ${client.user.tag}`);
 
   // Set up role-based permissions after bot is ready
   // If CLIENT_SECRET isn't provided we cannot obtain an OAuth2 application
