@@ -1870,8 +1870,10 @@ const _shutdown = async (signal) => {
 process.on('SIGTERM', () => _shutdown('SIGTERM'));
 process.on('SIGINT', () => _shutdown('SIGINT'));
 
+console.log("Attempting to login to Discord...");
 client.login(process.env.DISCORD_TOKEN).catch(e => {
   console.error("Failed to login:", e);
   process.exit(1);
 });
+
 
