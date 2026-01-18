@@ -1875,6 +1875,17 @@ const _shutdown = async (signal) => {
 process.on('SIGTERM', () => _shutdown('SIGTERM'));
 process.on('SIGINT', () => _shutdown('SIGINT'));
 
-client.login(process.env.DISCORD_TOKEN).catch(e => {
-  console.error("Failed to login:", e);
+console.log("Attempting to login with token:", process.env.DISCORD_TOKEN ? "SET" : "NOT SET");
+const loginTimeout = setTimeout(() => {
+  console.error("Login timeout - bot took more than 30 seconds to connect");
+  process.exit(1);
+}, 30000);
+
+client.login(process.env.DISCORD_TOKEN).then(() => {
+  clearTimeout(loginTimeout);
+}).catch(e => {
+  clearTimeout(loginTimeout);
+  console.error("Failed to login:", e.message);
+  console.error("Full error:", e);
+  process.exit(1);
 });
