@@ -454,6 +454,11 @@ async function sendJobOffersToUser(user, count = 5, role = null) {
 // ---------------------------------------------------------
 client.on('interactionCreate', async interaction => {
   try {
+    // Log all interactions
+    if (interaction.isCommand()) {
+      console.log(`[COMMAND] /${interaction.commandName} from ${interaction.user.tag}`);
+    }
+    
     // Autocomplete handling
     if (interaction.isAutocomplete()) {
       const focused = interaction.options.getFocused(true);
@@ -1653,37 +1658,51 @@ client.on('guildMemberRemove', async (member) => {
 // Adjust channel name or message id if you prefer a different trigger
 client.on('messageReactionAdd', async (reaction, user) => {
   try {
+    console.log(`[REACTION] User ${user.tag} reacted with ${reaction.emoji.name} in #${reaction.message.channel.name}`);
+    
     if (user.bot) return;
 
     if (reaction.partial) await reaction.fetch();
     if (reaction.message.partial) await reaction.message.fetch();
 
     // only watch for ✅
-    if (reaction.emoji.name !== '✅') return;
+    if (reaction.emoji.name !== '✅') {
+      console.log(`[REACTION] Skipping - not a ✅ emoji`);
+      return;
+    }
 
     // optionally restrict to a specific message ID or channel name
     // if you want to restrict to the rules channel, check:
     const channel = reaction.message.channel;
     // CHANGE 'rules' to the exact channel name you use for the rules message
-    if (!channel || channel.name !== 'rules') return;
+    if (!channel || channel.name !== 'rules') {
+      console.log(`[REACTION] Skipping - not in #rules channel (current: ${channel ? channel.name : 'unknown'})`);
+      return;
+    }
+
+    console.log(`[REACTION] Found ✅ in #rules from ${user.tag}`);
 
     // soft-lock
     if (jobOfferUsed.has(user.id)) {
+      console.log(`[REACTION] Soft-lock: User already has offers`);
       // optionally DM user about why they didn't get offers
       try { await user.send("⛔ You've already received your job offers."); } catch (e) {}
       return;
     }
 
+    console.log(`[REACTION] Adding ${user.tag} to jobOfferUsed set and sending offers`);
     jobOfferUsed.add(user.id);
 
     try {
+      console.log(`[REACTION] Calling sendJobOffersToUser for ${user.tag}`);
       const offers = await sendJobOffersToUser(user, 5);
+      console.log(`[REACTION] Received ${offers ? offers.length : 0} offers for ${user.tag}`);
       if (!offers || offers.length === 0) {
         jobOfferUsed.delete(user.id);
         try { await user.send("No teams available right now."); } catch (e) {}
       }
     } catch (err) {
-      console.error("sendJobOffersToUser error:", err);
+      console.error(`[REACTION] sendJobOffersToUser error for ${user.tag}:`, err);
       jobOfferUsed.delete(user.id);
       try { await user.send(`Error fetching offers: ${err.message}`); } catch (e) {}
     }
