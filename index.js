@@ -201,19 +201,17 @@ console.log("ENV CHECK - Token length:", process.env.DISCORD_TOKEN?.length, "Tok
 console.log("ENV CHECK - CLIENT_ID:", process.env.CLIENT_ID);
 console.log("ENV CHECK - GUILD_ID:", process.env.GUILD_ID);
 
-const rest = new REST({ version: '10', timeout: 60000 }).setToken(process.env.DISCORD_TOKEN);
+const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);
 
-// Register commands synchronously BEFORE login (like working bot)
 (async () => {
   try {
     console.log("Clearing old global commands...");
     await rest.put(Routes.applicationCommands(process.env.CLIENT_ID), { body: [] });
-    
     console.log("Registering guild commands...");
     await rest.put(Routes.applicationGuildCommands(process.env.CLIENT_ID, process.env.GUILD_ID), { body: commands });
     console.log("Slash commands registered to guild.");
   } catch (err) {
-    console.error("Failed to register commands:", err.message);
+    console.error("Failed to register commands:", err);
   }
 })();
 
