@@ -1879,18 +1879,22 @@ const _shutdown = async (signal) => {
 process.on('SIGTERM', () => _shutdown('SIGTERM'));
 process.on('SIGINT', () => _shutdown('SIGINT'));
 
-console.log("Attempting to login with token:", process.env.DISCORD_TOKEN ? "SET" : "NOT SET");
+console.log("Attempting to login with token:", process.env.DISCORD_TOKEN ? `${process.env.DISCORD_TOKEN.substring(0, 20)}...` : "NOT SET");
 
 const loginTimeout = setTimeout(() => {
-  console.error("Login timeout - bot took more than 30 seconds to connect");
+  console.error("Login timeout - bot took more than 60 seconds to connect");
   process.exit(1);
-}, 30000);
+}, 60000);
+
+client.once('connecting', () => console.log("Bot is connecting to Discord..."));
+client.once('reconnecting', () => console.log("Bot is reconnecting..."));
 
 client.login(process.env.DISCORD_TOKEN).then(() => {
   clearTimeout(loginTimeout);
+  console.log("Successfully logged in!");
 }).catch(e => {
   clearTimeout(loginTimeout);
-  console.error("Failed to login:", e.message);
-  console.error("Full error:", e);
+  console.error("Failed to login:", e.code || e.message);
+  console.error("Error details:", e);
   process.exit(1);
 });
