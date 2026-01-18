@@ -197,17 +197,31 @@ if (!process.env.DISCORD_TOKEN || !process.env.CLIENT_ID || !process.env.GUILD_I
   process.exit(1);
 }
 
+console.log("ENV CHECK - Token length:", process.env.DISCORD_TOKEN?.length, "Token starts with:", process.env.DISCORD_TOKEN?.substring(0, 10));
+console.log("ENV CHECK - CLIENT_ID:", process.env.CLIENT_ID);
+console.log("ENV CHECK - GUILD_ID:", process.env.GUILD_ID);
+
 const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);
 
 (async () => {
   try {
     console.log("Clearing old global commands...");
-    await rest.put(Routes.applicationCommands(process.env.CLIENT_ID), { body: [] });
+    const clearResult = await Promise.race([
+      rest.put(Routes.applicationCommands(process.env.CLIENT_ID), { body: [] }),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout after 10s')), 10000))
+    ]);
+    console.log("Cleared global commands, result:", clearResult);
+    
     console.log("Registering guild commands...");
-    await rest.put(Routes.applicationGuildCommands(process.env.CLIENT_ID, process.env.GUILD_ID), { body: commands });
+    const registerResult = await Promise.race([
+      rest.put(Routes.applicationGuildCommands(process.env.CLIENT_ID, process.env.GUILD_ID), { body: commands }),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout after 10s')), 10000))
+    ]);
     console.log("Slash commands registered to guild.");
   } catch (err) {
     console.error("Failed to register commands:", err);
+    console.error("Error message:", err.message);
+    console.error("Error code:", err.code);
     console.error("Full error:", JSON.stringify(err, null, 2));
   }
 })();
