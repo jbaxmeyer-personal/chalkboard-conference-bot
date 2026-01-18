@@ -77,26 +77,6 @@ const client = new Client({
 const jobOfferUsed = new Set(); // soft-lock so users don't spam requests
 if (!globalThis.jobOfferUsedGlobal) globalThis.jobOfferUsedGlobal = jobOfferUsed; // aid debugging across reloads
 
-// Start the bot login immediately (don't wait for command registration)
-console.log("Starting Discord bot login...");
-client.login(process.env.DISCORD_TOKEN)
-  .then(() => console.log("Discord login initiated successfully"))
-  .catch(e => {
-    console.error("FATAL: Failed to login to Discord:", e);
-    process.exit(1);
-  });
-
-// Log when bot connects to gateway
-client.on('debug', (info) => {
-  if (info.includes('Session') || info.includes('Ready') || info.includes('READY')) {
-    console.log('[Gateway]', info);
-  }
-});
-
-client.on('error', (error) => {
-  console.error('[Discord Client Error]', error);
-});
-
 // ---------------------------------------------------------
 // REGISTER GUILD (TESTING) COMMANDS
 // ---------------------------------------------------------
@@ -223,45 +203,25 @@ console.log("ENV CHECK - GUILD_ID:", process.env.GUILD_ID);
 
 const rest = new REST({ version: '10', timeout: 60000 }).setToken(process.env.DISCORD_TOKEN);
 
-// Track if commands were registered successfully
-let commandsRegistered = false;
-
-// Helper function to register commands
-async function registerCommands() {
-  if (commandsRegistered) {
-    console.log("Commands already registered, skipping");
-    return true;
-  }
-  
+// Register commands synchronously BEFORE login (like working bot)
+(async () => {
   try {
-    console.log(`Registering ${commands.length} guild commands...`);
-    const registerResult = await rest.put(
-      Routes.applicationGuildCommands(process.env.CLIENT_ID, process.env.GUILD_ID), 
-      { body: commands }
-    );
-    console.log(`✓ Successfully registered ${registerResult.length} slash commands`);
-    commandsRegistered = true;
-    return true;
+    console.log("Clearing old global commands...");
+    await rest.put(Routes.applicationCommands(process.env.CLIENT_ID), { body: [] });
+    
+    console.log("Registering guild commands...");
+    await rest.put(Routes.applicationGuildCommands(process.env.CLIENT_ID, process.env.GUILD_ID), { body: commands });
+    console.log("Slash commands registered to guild.");
   } catch (err) {
-    console.error("⚠ Command registration failed:", err.message);
-    if (err.code) console.error("  Error code:", err.code);
-    if (err.status) console.error("  HTTP status:", err.status);
-    return false;
+    console.error("Failed to register commands:", err.message);
   }
-}
+})();
 
 // ---------------------------------------------------------
 // BOT READY
 // ---------------------------------------------------------
 client.once('ready', async () => {
-  console.log(`✓✓✓ BOT IS ONLINE - Logged in as ${client.user.tag} ✓✓✓`);
-  console.log(`Bot is in ${client.guilds.cache.size} guild(s)`);
-
-  // Register commands now that bot is connected
-  console.log("Registering commands now that bot is online...");
-  await registerCommands().catch(err => {
-    console.error("Failed to register commands:", err.message);
-  });
+  console.log(`Logged in as ${client.user.tag}`);
 
   // Set up role-based permissions after bot is ready
   // If CLIENT_SECRET isn't provided we cannot obtain an OAuth2 application
@@ -512,8 +472,6 @@ async function sendJobOffersToUser(user, count = 5, role = null) {
 client.on('interactionCreate', async interaction => {
   try {
     // Log all interactions
-    console.log(`[INTERACTION RECEIVED] Type: ${interaction.type}, User: ${interaction.user.tag}`);
-    
     if (interaction.isCommand()) {
       console.log(`[COMMAND] /${interaction.commandName} from ${interaction.user.tag}`);
     }
@@ -1916,3 +1874,9 @@ const _shutdown = async (signal) => {
 
 process.on('SIGTERM', () => _shutdown('SIGTERM'));
 process.on('SIGINT', () => _shutdown('SIGINT'));
+
+client.login(process.env.DISCORD_TOKEN).catch(e => {
+  console.error("Failed to login:", e);
+  process.exit(1);
+});
+
