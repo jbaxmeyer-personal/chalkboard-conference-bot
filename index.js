@@ -186,6 +186,17 @@ const commands = [
     .addStringOption(option => option.setName('summary').setDescription('Game summary').setRequired(true))
 ].map(c => c.toJSON());
 
+// Validate required environment variables before creating REST client
+if (!process.env.DISCORD_TOKEN || !process.env.CLIENT_ID || !process.env.GUILD_ID) {
+  console.error("FATAL: Missing required environment variables!");
+  console.error("DISCORD_TOKEN:", process.env.DISCORD_TOKEN ? "SET" : "MISSING");
+  console.error("CLIENT_ID:", process.env.CLIENT_ID ? "SET" : "MISSING");
+  console.error("GUILD_ID:", process.env.GUILD_ID ? "SET" : "MISSING");
+  console.error("SUPABASE_URL:", process.env.SUPABASE_URL ? "SET" : "MISSING");
+  console.error("SUPABASE_KEY:", process.env.SUPABASE_KEY ? "SET" : "MISSING");
+  process.exit(1);
+}
+
 const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);
 
 (async () => {
@@ -197,6 +208,7 @@ const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);
     console.log("Slash commands registered to guild.");
   } catch (err) {
     console.error("Failed to register commands:", err);
+    console.error("Full error:", JSON.stringify(err, null, 2));
   }
 })();
 
