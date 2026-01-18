@@ -77,6 +77,13 @@ const client = new Client({
 const jobOfferUsed = new Set(); // soft-lock so users don't spam requests
 if (!globalThis.jobOfferUsedGlobal) globalThis.jobOfferUsedGlobal = jobOfferUsed; // aid debugging across reloads
 
+// Start the bot login immediately (don't wait for command registration)
+console.log("Starting Discord bot login...");
+client.login(process.env.DISCORD_TOKEN).catch(e => {
+  console.error("Failed to login:", e);
+  process.exit(1);
+});
+
 // ---------------------------------------------------------
 // REGISTER GUILD (TESTING) COMMANDS
 // ---------------------------------------------------------
@@ -206,7 +213,7 @@ const rest = new REST({ version: '10', timeout: 60000 }).setToken(process.env.DI
 // Track if commands were registered successfully
 let commandsRegistered = false;
 
-// Helper function to register commands with retry logic
+// Helper function to register commands
 async function registerCommands() {
   if (commandsRegistered) {
     console.log("Commands already registered, skipping");
@@ -229,13 +236,6 @@ async function registerCommands() {
     return false;
   }
 }
-
-// Try to register commands early (non-blocking, will retry on bot ready if it fails)
-setTimeout(() => {
-  registerCommands().catch(err => {
-    console.log("Early registration failed, will retry when bot is ready");
-  });
-}, 3000); // Wait 3 seconds for health check to establish first
 
 // ---------------------------------------------------------
 // BOT READY
@@ -1902,7 +1902,3 @@ const _shutdown = async (signal) => {
 
 process.on('SIGTERM', () => _shutdown('SIGTERM'));
 process.on('SIGINT', () => _shutdown('SIGINT'));
-
-client.login(process.env.DISCORD_TOKEN).catch(e => {
-  console.error("Failed to login:", e);
-});
