@@ -79,6 +79,15 @@ const client = new Client({
   partials: [ Partials.Message, Partials.Channel, Partials.Reaction ]
 });
 
+console.log("[STARTUP] Discord client initialized");
+console.log("[STARTUP] Required env vars:", {
+  TOKEN: process.env.DISCORD_TOKEN ? "SET" : "NOT SET",
+  CLIENT_ID: process.env.CLIENT_ID ? "SET" : "NOT SET",
+  GUILD_ID: process.env.GUILD_ID ? "SET" : "NOT SET",
+  SUPABASE_URL: process.env.SUPABASE_URL ? "SET" : "NOT SET",
+  SUPABASE_KEY: process.env.SUPABASE_KEY ? "SET" : "NOT SET"
+});
+
 const jobOfferUsed = new Set(); // soft-lock so users don't spam requests
 if (!globalThis.jobOfferUsedGlobal) globalThis.jobOfferUsedGlobal = jobOfferUsed; // aid debugging across reloads
 
