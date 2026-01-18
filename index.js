@@ -1774,7 +1774,14 @@ client.on('messageCreate', async msg => {
     const guild = client.guilds.cache.first();
     if (guild) {
       const general = guild.channels.cache.find(c => c.name === 'general' && c.isTextBased());
-      if (general) general.send(`🏈 <@${userId}> has accepted a job offer from **${team.name}**!`).catch(() => {});
+      
+      // Format role for announcement
+      let roleText = "Head Coach"; // default
+      if (role === "OC") roleText = "Offensive Coordinator";
+      else if (role === "DC") roleText = "Defensive Coordinator";
+      else if (role === "HC") roleText = "Head Coach";
+      
+      if (general) general.send(`🏈 <@${userId}> has accepted a job offer from **${team.name}** as **${roleText}**!`).catch(() => {});
 
       // Create team-specific channel (named after school name)
       try {
@@ -1795,8 +1802,13 @@ client.on('messageCreate', async msg => {
         });
         console.log(`Created channel #${channelName} for ${team.name}`);
 
-        // Send welcome message
-        await newChannel.send(`Welcome to **${team.name}**! <@${userId}> is the Head Coach.`);
+        // Send welcome message with role
+        let roleText = "Head Coach"; // default
+        if (role === "OC") roleText = "Offensive Coordinator";
+        else if (role === "DC") roleText = "Defensive Coordinator";
+        else if (role === "HC") roleText = "Head Coach";
+        
+        await newChannel.send(`Welcome to **${team.name}**! <@${userId}> is the ${roleText}.`);
       } catch (err) {
         console.error(`Failed to create channel for ${team.name}:`, err);
       }
