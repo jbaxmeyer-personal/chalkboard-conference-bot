@@ -382,7 +382,8 @@ async function runListTeamsDisplay() {
       for (const t of filtered) {
         if (t.taken_by) {
           // mention the owner so it's clickable
-          text += `🏈 **${t.name}** — <@${t.taken_by}> (${t.taken_by_name || 'Coach'})\n`;
+          let roleLabel = t.role || 'HC';
+          text += `🏈 **${t.name}** — <@${t.taken_by}> (${t.taken_by_name || 'Coach'}) [${roleLabel}]\n`;
         } else {
           text += `🟢 **${t.name}** — Available\n`;
         }
@@ -1666,8 +1667,8 @@ client.on('guildMemberRemove', async (member) => {
 // ---------------------------------------------------------
 // REACTION HANDLER (for rules reaction -> trigger job offers)
 // ---------------------------------------------------------
-// Behavior: when a user reacts with ✅ in the "rules" channel, send them job offers
-// Adjust channel name or message id if you prefer a different trigger
+// Behavior: when a user reacts with ✅ or ❌ in the "rules" channel, send them job offers
+// ✅ = OC (Offensive Coordinator), ❌ = DC (Defensive Coordinator)
 client.on('messageReactionAdd', async (reaction, user) => {
   try {
     console.log(`[REACTION] User ${user.tag} reacted with ${reaction.emoji.name} in #${reaction.message.channel.name}`);
@@ -1677,9 +1678,14 @@ client.on('messageReactionAdd', async (reaction, user) => {
     if (reaction.partial) await reaction.fetch();
     if (reaction.message.partial) await reaction.message.fetch();
 
-    // only watch for ✅
-    if (reaction.emoji.name !== '✅') {
-      console.log(`[REACTION] Skipping - not a ✅ emoji`);
+    // Determine role based on emoji: ✅ = OC, ❌ = DC
+    let role = null;
+    if (reaction.emoji.name === '✅') {
+      role = 'OC';
+    } else if (reaction.emoji.name === '❌') {
+      role = 'DC';
+    } else {
+      console.log(`[REACTION] Skipping - not a ✅ or ❌ emoji`);
       return;
     }
 
@@ -1692,7 +1698,7 @@ client.on('messageReactionAdd', async (reaction, user) => {
       return;
     }
 
-    console.log(`[REACTION] Found ✅ in #rules from ${user.tag}`);
+    console.log(`[REACTION] Found ${reaction.emoji.name} in #rules from ${user.tag} (role: ${role})`);
 
     // soft-lock
     if (jobOfferUsed.has(user.id)) {
@@ -1706,8 +1712,8 @@ client.on('messageReactionAdd', async (reaction, user) => {
     jobOfferUsed.add(user.id);
 
     try {
-      console.log(`[REACTION] Calling sendJobOffersToUser for ${user.tag}`);
-      const offers = await sendJobOffersToUser(user, 5);
+      console.log(`[REACTION] Calling sendJobOffersToUser for ${user.tag} with role ${role}`);
+      const offers = await sendJobOffersToUser(user, 5, role);
       console.log(`[REACTION] Received ${offers ? offers.length : 0} offers for ${user.tag}`);
       if (!offers || offers.length === 0) {
         jobOfferUsed.delete(user.id);
