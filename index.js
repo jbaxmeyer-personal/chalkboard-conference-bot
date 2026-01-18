@@ -196,9 +196,13 @@ const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);
     await rest.put(Routes.applicationGuildCommands(process.env.CLIENT_ID, process.env.GUILD_ID), { body: commands });
     console.log("Slash commands registered to guild.");
   } catch (err) {
-    console.error("Failed to register commands:", err);
+    console.error("Failed to register commands:", err.message);
+    // Don't fail startup if command registration fails - the bot can still run
+    // Command registration can be retried manually if needed
   }
-})();
+})().catch(e => {
+  console.error("Startup command registration error:", e.message);
+});
 
 // ---------------------------------------------------------
 // BOT READY
@@ -1877,41 +1881,16 @@ process.on('SIGINT', () => _shutdown('SIGINT'));
 
 console.log("Attempting to login with token:", process.env.DISCORD_TOKEN ? "SET" : "NOT SET");
 
-// Test Discord API connectivity first
-const testDiscord = async () => {
-  try {
-    console.log("Testing Discord API connectivity...");
-    const res = await fetch('https://discord.com/api/v10/gateway');
-    console.log("Discord API response status:", res.status);
-    if (!res.ok) {
-      console.error("Discord API returned:", res.statusText);
-      return false;
-    }
-    console.log("Discord API is reachable");
-    return true;
-  } catch (e) {
-    console.error("Cannot reach Discord API:", e.message);
-    return false;
-  }
-};
+const loginTimeout = setTimeout(() => {
+  console.error("Login timeout - bot took more than 30 seconds to connect");
+  process.exit(1);
+}, 30000);
 
-testDiscord().then(isUp => {
-  if (!isUp) {
-    console.error("Discord is unreachable, exiting");
-    process.exit(1);
-  }
-  
-  const loginTimeout = setTimeout(() => {
-    console.error("Login timeout - bot took more than 30 seconds to connect");
-    process.exit(1);
-  }, 30000);
-
-  client.login(process.env.DISCORD_TOKEN).then(() => {
-    clearTimeout(loginTimeout);
-  }).catch(e => {
-    clearTimeout(loginTimeout);
-    console.error("Failed to login:", e.message);
-    console.error("Full error:", e);
-    process.exit(1);
-  });
+client.login(process.env.DISCORD_TOKEN).then(() => {
+  clearTimeout(loginTimeout);
+}).catch(e => {
+  clearTimeout(loginTimeout);
+  console.error("Failed to login:", e.message);
+  console.error("Full error:", e);
+  process.exit(1);
 });
