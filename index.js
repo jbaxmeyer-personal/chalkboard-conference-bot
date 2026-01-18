@@ -205,17 +205,23 @@ const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);
 (async () => {
   try {
     console.log("Clearing old global commands...");
-    await rest.put(Routes.applicationCommands(process.env.CLIENT_ID), { body: [] });
+    const clearResp = await rest.put(Routes.applicationCommands(process.env.CLIENT_ID), { body: [] });
+    console.log("✓ Cleared old global commands");
+    
     console.log("Registering guild commands...");
-    await rest.put(Routes.applicationGuildCommands(process.env.CLIENT_ID, process.env.GUILD_ID), { body: commands });
-    console.log("Slash commands registered to guild.");
+    const registerResp = await rest.put(Routes.applicationGuildCommands(process.env.CLIENT_ID, process.env.GUILD_ID), { body: commands });
+    console.log(`✓ Slash commands registered to guild (${registerResp.length} commands)`);
   } catch (err) {
-    console.error("Failed to register commands:", err.message);
+    console.error("Failed to register commands:");
+    console.error("  Error code:", err.code);
+    console.error("  Error message:", err.message);
+    if (err.status) console.error("  HTTP status:", err.status);
     // Don't fail startup if command registration fails - the bot can still run
     // Command registration can be retried manually if needed
   }
 })().catch(e => {
   console.error("Startup command registration error:", e.message);
+  console.error("Stack:", e.stack);
 });
 
 // ---------------------------------------------------------
