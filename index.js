@@ -85,7 +85,8 @@ const commands = [
   new SlashCommandBuilder()
     .setName('joboffers')
     .setDescription('Get your Chalkboard Conference job offers')
-    .setDMPermission(false),
+    .setDMPermission(false)
+    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
 
   new SlashCommandBuilder()
     .setName('resetteam')
