@@ -320,7 +320,7 @@ function buildOffersGroupedByConference(offers) {
 }
 
 /**
- * Run the listteams display logic (posts to member-list channel)
+ * Run the listteams display logic (posts to team-list channel)
  * Called both by /listteams command and by team claim/reset flows
  */
 async function runListTeamsDisplay() {
@@ -339,7 +339,7 @@ async function runListTeamsDisplay() {
     const guild = client.guilds.cache.first();
     if (!guild) return false;
 
-    const channel = guild.channels.cache.find(c => c.name === 'member-list' && c.isTextBased());
+    const channel = guild.channels.cache.find(c => c.name === 'team-list' && c.isTextBased());
     if (!channel) return false;
 
     // delete old bot messages FIRST
@@ -661,7 +661,7 @@ client.on('interactionCreate', async interaction => {
         return interaction.editReply("Error posting team list.");
       }
 
-      return interaction.editReply("Team list posted to #member-list.");
+      return interaction.editReply("Team list posted to #team-list.");
     }
 
     // ---------------------------
