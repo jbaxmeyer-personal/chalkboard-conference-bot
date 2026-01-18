@@ -1881,10 +1881,19 @@ process.on('SIGINT', () => _shutdown('SIGINT'));
 
 console.log("Attempting to login with token:", process.env.DISCORD_TOKEN ? `${process.env.DISCORD_TOKEN.substring(0, 20)}...` : "NOT SET");
 
+client.on('error', err => {
+  console.error("[CLIENT ERROR]", err.code || err.message);
+});
+
+client.on('warn', msg => {
+  console.warn("[CLIENT WARN]", msg);
+});
+
 const loginTimeout = setTimeout(() => {
-  console.error("Login timeout - bot took more than 60 seconds to connect");
+  console.error("Login timeout - bot took more than 2 minutes to connect");
+  console.error("This likely means Discord is rejecting the connection or there's a network issue");
   process.exit(1);
-}, 60000);
+}, 120000);
 
 client.once('connecting', () => console.log("Bot is connecting to Discord..."));
 client.once('reconnecting', () => console.log("Bot is reconnecting..."));
@@ -1894,7 +1903,7 @@ client.login(process.env.DISCORD_TOKEN).then(() => {
   console.log("Successfully logged in!");
 }).catch(e => {
   clearTimeout(loginTimeout);
-  console.error("Failed to login:", e.code || e.message);
-  console.error("Error details:", e);
+  console.error("Failed to login - Error code:", e.code);
+  console.error("Error message:", e.message);
   process.exit(1);
 });
