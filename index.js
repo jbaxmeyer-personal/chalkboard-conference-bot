@@ -1889,21 +1889,15 @@ client.on('warn', msg => {
   console.warn("[CLIENT WARN]", msg);
 });
 
-const loginTimeout = setTimeout(() => {
-  console.error("Login timeout - bot took more than 2 minutes to connect");
-  console.error("This likely means Discord is rejecting the connection or there's a network issue");
-  process.exit(1);
-}, 120000);
-
 client.once('connecting', () => console.log("Bot is connecting to Discord..."));
 client.once('reconnecting', () => console.log("Bot is reconnecting..."));
 
-client.login(process.env.DISCORD_TOKEN).then(() => {
-  clearTimeout(loginTimeout);
-  console.log("Successfully logged in!");
-}).catch(e => {
-  clearTimeout(loginTimeout);
+client.login(process.env.DISCORD_TOKEN).catch(e => {
   console.error("Failed to login - Error code:", e.code);
   console.error("Error message:", e.message);
-  process.exit(1);
+  console.error("Will retry in 10 seconds...");
+  setTimeout(() => {
+    console.log("Retrying login...");
+    client.login(process.env.DISCORD_TOKEN);
+  }, 10000);
 });
