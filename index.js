@@ -1675,8 +1675,15 @@ client.on('messageReactionAdd', async (reaction, user) => {
     // if you want to restrict to the rules channel, check:
     const channel = reaction.message.channel;
     // CHANGE 'rules' to the exact channel name you use for the rules message
-    if (!channel || channel.name !== 'rules') {
-      console.log(`[REACTION] Skipping - not in #rules channel (current: ${channel ? channel.name : 'unknown'})`);
+    if (!channel) {
+      console.log(`[REACTION] No channel found`);
+      return;
+    }
+    
+    console.log(`[REACTION] Message in channel: ${channel.name}`);
+    
+    if (channel.name.toLowerCase() !== 'rules') {
+      console.log(`[REACTION] Skipping - not in #rules channel (current: ${channel.name})`);
       return;
     }
 
