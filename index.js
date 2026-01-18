@@ -1871,9 +1871,13 @@ process.on('SIGTERM', () => _shutdown('SIGTERM'));
 process.on('SIGINT', () => _shutdown('SIGINT'));
 
 console.log("Attempting to login to Discord...");
-client.login(process.env.DISCORD_TOKEN).catch(e => {
-  console.error("Failed to login:", e);
-  process.exit(1);
-});
+client.login(process.env.DISCORD_TOKEN)
+  .then(() => console.log("client.login() promise resolved"))
+  .catch(e => {
+    console.error("Failed to login:", e);
+    process.exit(1);
+  });
+
+console.log("Login initiated, waiting for ready event...");
 
 
